@@ -1,0 +1,37 @@
+[1] Mobile nodes join the zone and register through the nearest gateway
+   AMB1 registers via GW2 : RegReq(home=10.10.0.5, CoA=GW2, life=60 s) path AMB1-POL1-RES2-GW2 -> HA binding updated
+   POL1 registers via GW2 : RegReq(home=10.10.0.6, CoA=GW2, life=60 s) path POL1-RES2-GW2 -> HA binding updated
+   RES1 registers via GW1 : RegReq(home=10.10.0.7, CoA=GW1, life=60 s) path RES1-MED1-GW1 -> HA binding updated
+   MED1 registers via GW1 : RegReq(home=10.10.0.8, CoA=GW1, life=60 s) path MED1-GW1 -> HA binding updated
+   RES2 registers via GW2 : RegReq(home=10.10.0.9, CoA=GW2, life=60 s) path RES2-GW2 -> HA binding updated
+
+[2] Traffic
+   AMB1 -> POL1 : intra-zone AODV direct, no Mobile IP (AMB1-POL1)
+   AMB1 -> EOC : AODV to GW2 then reverse tunnel (3 hops in zone)
+   EOC -> AMB1 : HA tunnels (20 B header) to GW2, then AODV GW2-RES2-POL1-AMB1
+
+[3] Failure: gateway GW1 goes down -> switch to GW2 and re-register
+   MED1 registers via GW2 : RegReq(home=10.10.0.8, CoA=GW2, life=60 s) path MED1-GW2 -> HA binding updated
+   AMB1 registers via GW2 : RegReq(home=10.10.0.5, CoA=GW2, life=60 s) path AMB1-POL1-RES2-GW2 -> HA binding updated
+   EOC -> MED1 : HA tunnels (20 B header) to GW2, then AODV GW2-MED1
+
+[4] Failure: node RES1 fails -> reroute / rediscover
+   AMB1 -> MED1 : intra-zone AODV direct, no Mobile IP (AMB1-POL1-RES2-MED1)
+   AMB1 -> EOC : AODV to GW2 then reverse tunnel (3 hops in zone)
+
+[5] Partition: POL1 fails as well -> store-and-carry-forward
+   AMB1 -> EOC : no route -> store-and-carry-forward (buffered, 1 queued)
+   vehicle repositions to bridge the gap: AMB1 moves to (110, 60)
+   AMB1 -> EOC : AODV to GW2 then reverse tunnel (2 hops in zone)
+
+[6] HA unreachable
+   HA unreachable (registration timeout) -> use redundant HA / continue intra-zone only
+   RES2 -> MED1 : intra-zone AODV direct, no Mobile IP (RES2-MED1)
+
+[7] Binding lifetime (60 s): MN must re-register at 50 % (30 s) or the binding expires
+   EOC -> AMB1 : binding missing/expired -> DROP
+   AMB1 registers via GW2 : RegReq(home=10.10.0.5, CoA=GW2, life=60 s) path AMB1-RES2-GW2 -> HA binding updated
+   EOC -> AMB1 : HA tunnels (20 B header) to GW2, then AODV GW2-RES2-AMB1
+
+Performance parameters (design targets): control delay < 500 ms, data delay < 150 ms,
+tunnel overhead 20 B/packet, AODV discovery 50-200 ms, HELLO interval 1 s, route lifetime 10 s
